@@ -130,6 +130,7 @@ Final_TW_df = bind_rows(Mr_TW_df, Prof_TW_df, Gwynnda_TW_df)
 
 Final_TW_df
 ```
+
 Write a paragraph about these data.
 
 In Mr.Trash Wheel data set, there are 584 rows and 16 cols. The key variables are wheel_type, dumpster, weight_tons, homes_powered.
@@ -152,30 +153,93 @@ filter(Final_TW_df, wheel_type == "GTW", year == "2021", month == "July") |>
 ```
 
 #Problem 3
+Import, clean, and tidy the dataset of baseline demographics. 
+Ensure that sex and APOE4 carrier status are appropriate encoded (i.e. not numeric), and remove any participants who do not meet the stated inclusion criteria (i.e. no MCI at baseline). 
+
 ```{r}
 MCI_Base = 
-  read_csv("data/MCI_baseline.csv") |>
+  read_csv("data/MCI_baseline.csv", skip = 1, na = c(".")) |>
   janitor::clean_names() |>
-  drop_na(age_at_onset) |>
-  mutate()
+  mutate(sex = case_match(sex, 1 ~ "male", 0 ~ "female"),
+         apoe4 = case_match(apoe4, 1 ~ "positive", 0 ~ "negative"))
 
 MCI_Base
 ```
+There are 483 individuals at first.
+
+Discuss important steps in the import process and relevant features of the dataset.
+1. import the data and clean names.
+2. drop participants who do not meet the stated inclusion criteria
+3. mutate sex and APOE4 carrier status to make sure they are not numeric.
+
+```{r}
+MCI_Base_1 = 
+  MCI_Base |>
+  filter(age_at_onset - current_age > 0 | is.na(age_at_onset))
+
+MCI_Base_1
+```
+How many participants were recruited, and of these how many developed MCI?
+There are 479 individuals when we remove the individuals who already have MCI at baseline. 
+
+```{r}
+MCI_Base_2 = 
+  MCI_Base |>
+  filter(age_at_onset - current_age > 0)
+
+MCI_Base_2
+```
+How many participants were recruited, and of these how many developed MCI?
+There are 93 individuals who developed MCI.
+
+```{r}
+mean(MCI_Base_1$current_age)
+```
+What is the average baseline age?
+The average baseline age is 65 years old.
+
+```{r}
+nrow(filter(MCI_Base_1, apoe4 == "positive", sex == "female")) /
+  nrow(filter(MCI_Base_1, sex == "female"))
+```
+What proportion of women in the study are APOE4 carriers?
+0.3 of women in the study are APOE4 carriers
 
 ```{r}
 MCI_Amy = 
-  read_csv("data/MCI_amyloid.csv") |>
+  read_csv("data/MCI_amyloid.csv", skip = 1) |>
   janitor::clean_names() |>
-  pivot_longer() |>
-  mutate(
-    years_since_diagnosed = replace(years_since_diagnosed, years_since_diagnosed == "bl", "0"),
-    years_since_diagnosed = as.numeric(years_since_diagnosed))
+  rename(time_0 = baseline, id = study_id) |>
+  pivot_longer(time_0:time_8,
+               names_to = "follow_up_time",
+               values_to = "apoe4")
 
 MCI_Amy
 ```
+Discuss important steps in the import process and relevant features of the dataset.
+1. import the data and clean names.
+2. rename baseline to time_0 for consistency
+3. use pivot_longer to tidy the data
+There are total of 2435 observations in the data MCI_Amy.
+
+Check whether some participants appear in only the baseline or amyloid datasets, and comment on your findings.
+Combine the demographic and biomarker datasets so that only participants who appear in both datasets are retained, and briefly describe the resulting dataset; export the result as a CSV to your data directory.
 
 ```{r}
+Baseline = anti_join(MCI_Base_1, MCI_Amy, by = "id")
+Amy = anti_join(MCI_Amy, MCI_Base_1, by = "id")
+Merge_MCI = inner_join(MCI_Base_1, MCI_Amy, by = "id")
 
+Baseline
+Amy
+Merge_MCI
 ```
+There are 8 participants in the baseline data but not in the amyloid data.
+(ID: 14, 49, 92, 179, 268, 304, 389, 412)
+There are 16 participants in the amyloid data but no in the baseline data.
+(ID: 72, 234, 283, 380, 484, 485, 486, 487, 488, 489, 490, 491, 492, 493, 494, 495)
+There are 2355 observations appeared in both data sets, which means that there are 2355/5=471 participants.
 
-
+```{r}
+write.csv(Merge_MCI, "Merge_MCI.csv")
+```
